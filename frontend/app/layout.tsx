@@ -4,6 +4,7 @@ import "./globals.css";
 import { CurrentUserProvider } from "./CurrentUserContext";
 import Nav from "./Nav";
 import Toast from "./Toast";
+import AuthGate from "./AuthGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,9 @@ export default function RootLayout({
         <CurrentUserProvider>
           <Nav />
           <Toast />
-          <main className="flex-1">{children}</main>
+          <main className="flex-1">
+            <AuthGate>{children}</AuthGate>
+          </main>
         </CurrentUserProvider>
       </body>
     </html>
