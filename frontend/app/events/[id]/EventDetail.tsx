@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCurrentUser } from "../../CurrentUserContext";
 import type { Event, RSVP } from "./page";
 import {
@@ -33,8 +34,10 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [groupName, setGroupName] = useState<string | null>(null);
 
   const ownerId = normalizeUUID(event.created_by);
+  const groupId = normalizeUUID(event.group_id);
   const isOwner = !loading && !!currentUser && currentUser.id === ownerId;
   const isCoHost = !!currentUser && hostIds.includes(currentUser.id);
   // "Manager" = owner or co-host — same powers everywhere: edit, delete,
@@ -48,6 +51,19 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
     ? rsvps.find((r) => r.user_id === currentUser.id)?.status
     : undefined;
   const canSeeRSVPs = isManager || !!myRSVPStatus;
+
+  // Group-hosted events only carry the group's id — fetch its name once
+  // so the "Hosted by" link has something readable to show.
+  useEffect(() => {
+    if (!groupId) {
+      setGroupName(null);
+      return;
+    }
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/groups/${groupId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((g: { name: string } | null) => setGroupName(g?.name ?? null))
+      .catch(() => setGroupName(null));
+  }, [groupId]);
 
   // Fetch the user list (needed to show names in the RSVP list) once we
   // know we're allowed to see it — people with no relationship to the
@@ -110,7 +126,6 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
     if (capacityValue !== null) params.set("capacity_max", String(capacityValue));
     // Carry over which group hosted the original event, so duplicating a
     // group event doesn't silently reset it to a personal event.
-    const groupId = normalizeUUID(event.group_id);
     if (groupId) params.set("group_id", groupId);
     router.push(`/events/new?${params.toString()}`);
   }
@@ -292,6 +307,14 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
             <p className="text-neutral-500 text-sm mt-1">
               {new Date(event.starts_at).toLocaleString()}
             </p>
+            {groupId && groupName && (
+              <Link
+                href={`/groups/${groupId}`}
+                className="inline-block text-sm text-neutral-500 hover:text-neutral-900 underline underline-offset-2 mt-1"
+              >
+                Hosted by {groupName}
+              </Link>
+            )}
           </div>
 
           <div className="flex gap-2 shrink-0">
