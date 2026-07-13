@@ -16,6 +16,28 @@ type PendingRequest = {
   created_at: string;
 };
 
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function Avatar({ name, size = 9 }: { name: string; size?: number }) {
+  return (
+    <span className="gradient-ring inline-flex shrink-0">
+      <span
+        className={`flex items-center justify-center rounded-full bg-white text-xs font-semibold text-neutral-800`}
+        style={{ width: `${size * 4}px`, height: `${size * 4}px` }}
+      >
+        {initials(name)}
+      </span>
+    </span>
+  );
+}
+
 export default function FriendsPage() {
   const { currentUser, loading } = useCurrentUser();
   const [friends, setFriends] = useState<User[]>([]);
@@ -143,7 +165,13 @@ export default function FriendsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      <h1 className="text-2xl font-semibold mb-8">Friends</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight">Friends</h1>
+        <p className="text-neutral-500 text-sm mt-1">
+          {friends.length} friend{friends.length === 1 ? "" : "s"}
+          {pending.length > 0 && ` · ${pending.length} pending request${pending.length === 1 ? "" : "s"}`}
+        </p>
+      </div>
 
       <div className="relative mb-8">
         <input
@@ -151,23 +179,24 @@ export default function FriendsPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name or email to add a friend..."
-          className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
+          className="w-full border border-neutral-300 rounded-full px-4 py-2.5 text-sm bg-white/70 focus:bg-white outline-none focus:ring-2 focus:ring-violet-200 transition-colors"
         />
         {searchResults.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full border border-neutral-200 rounded-md bg-white shadow-lg">
+          <div className="absolute z-10 mt-2 w-full border border-neutral-200 rounded-2xl bg-white shadow-lg overflow-hidden">
             {searchResults.map((u) => (
               <div
                 key={u.id}
-                className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 last:border-0"
+                className="flex items-center gap-3 px-3 py-2.5 border-t border-neutral-100 first:border-t-0 hover:bg-neutral-50"
               >
-                <div>
-                  <p className="text-sm font-medium">{u.name}</p>
-                  <p className="text-xs text-neutral-500">{u.email}</p>
+                <Avatar name={u.name} size={8} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{u.name}</p>
+                  <p className="text-xs text-neutral-500 truncate">{u.email}</p>
                 </div>
                 <button
                   disabled={busy}
                   onClick={() => sendRequest(u.id)}
-                  className="text-xs bg-neutral-900 text-white px-2 py-1 rounded hover:bg-neutral-700 disabled:opacity-50"
+                  className="btn-gradient text-xs px-3 py-1.5 disabled:opacity-50 shrink-0"
                 >
                   Add
                 </button>
@@ -184,30 +213,33 @@ export default function FriendsPage() {
       )}
 
       {pending.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-medium mb-2">Friend requests</h2>
+        <div className="mb-8 border border-blue-200 bg-blue-50/60 rounded-2xl shadow-sm p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-3">
+            Friend requests ({pending.length})
+          </h2>
           <div className="flex flex-col gap-2">
             {pending.map((p) => (
               <div
                 key={p.requester_id}
-                className="flex items-center justify-between border border-blue-200 bg-blue-50 rounded-md px-3 py-2"
+                className="flex items-center gap-3 border border-blue-100 bg-white rounded-xl px-3 py-2.5"
               >
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-xs text-neutral-500">{p.email}</p>
+                <Avatar name={p.name} size={8} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-neutral-500 truncate">{p.email}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 shrink-0">
                   <button
                     disabled={busy}
                     onClick={() => respond(p.requester_id, true)}
-                    className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-500 disabled:opacity-50"
+                    className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-full hover:bg-green-500 disabled:opacity-50"
                   >
                     Accept
                   </button>
                   <button
                     disabled={busy}
                     onClick={() => respond(p.requester_id, false)}
-                    className="text-xs bg-neutral-200 text-neutral-700 px-2 py-1 rounded hover:bg-neutral-300 disabled:opacity-50"
+                    className="text-xs bg-neutral-200 text-neutral-700 px-2.5 py-1 rounded-full hover:bg-neutral-300 disabled:opacity-50"
                   >
                     Decline
                   </button>
@@ -219,24 +251,27 @@ export default function FriendsPage() {
       )}
 
       <div>
-        <h2 className="text-sm font-medium mb-2">Your friends ({friends.length})</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-3">
+          Your friends ({friends.length})
+        </h2>
         {friends.length === 0 && (
           <p className="text-sm text-neutral-500">No friends yet — search above to add some.</p>
         )}
-        <div className="flex flex-col gap-2">
+        <div className="grid gap-2.5">
           {friends.map((f) => (
             <div
               key={f.id}
-              className="flex items-center justify-between border border-neutral-200 rounded-md px-3 py-2 bg-white"
+              className="card-hover flex items-center gap-3 border border-neutral-200/80 rounded-2xl px-3.5 py-2.5 bg-white shadow-sm"
             >
-              <div>
-                <p className="text-sm font-medium">{f.name}</p>
-                <p className="text-xs text-neutral-500">{f.email}</p>
+              <Avatar name={f.name} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{f.name}</p>
+                <p className="text-xs text-neutral-500 truncate">{f.email}</p>
               </div>
               <button
                 disabled={busy}
                 onClick={() => unfriend(f.id)}
-                className="text-xs text-neutral-500 hover:text-red-600 disabled:opacity-50"
+                className="text-xs text-neutral-400 hover:text-red-600 disabled:opacity-50 shrink-0"
               >
                 Remove
               </button>
