@@ -1,0 +1,16 @@
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Backend (Go)
+backend/clubmax-api
+backend/*.exe
+
+# OS/editor
+.DS_Store
+*.log
