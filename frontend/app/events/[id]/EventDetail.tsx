@@ -299,17 +299,23 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
     }
   }
 
-  const pending = rsvps.filter((r) => r.status === "pending");
-  // Declined RSVPs are only visible to the event's actual creator — co-hosts
-  // still see who's pending/joined/etc, just not who turned it down.
-  const others = rsvps.filter(
-    (r) => r.status !== "pending" && (r.status !== "declined" || isOwner)
-  );
-  // Hosts (owner + co-hosts) don't have their own RSVP row — they show up
-  // at the top of the RSVPs list separately, owner first with a crown.
+  // Hosts (owner + co-hosts) show up at the top of the RSVPs list
+  // separately, owner first with a crown — so they're excluded below to
+  // avoid showing the same person twice if they also have a leftover RSVP
+  // row (e.g. joined before becoming a co-host).
   const hostIds_ordered = ownerId
     ? [ownerId, ...hostIds.filter((id) => id !== ownerId)]
     : hostIds;
+  const hostIdSet = new Set(hostIds_ordered);
+  const pending = rsvps.filter((r) => r.status === "pending" && !hostIdSet.has(r.user_id));
+  // Declined RSVPs are only visible to the event's actual creator — co-hosts
+  // still see who's pending/joined/etc, just not who turned it down.
+  const others = rsvps.filter(
+    (r) =>
+      r.status !== "pending" &&
+      (r.status !== "declined" || isOwner) &&
+      !hostIdSet.has(r.user_id)
+  );
   const joinedCount = rsvps.filter((r) => r.status === "joined").length;
   const capacity = capacityNumber(event.capacity_max);
   const category = formatText(event.category);

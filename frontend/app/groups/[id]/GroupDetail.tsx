@@ -183,7 +183,7 @@ export default function GroupDetail({
                   </button>
                 )}
 
-                {isActiveMember && friends.length > 0 && (
+                {isActiveMember && friends.filter((f) => !memberIds.has(f.id)).length > 0 && (
                   <div className="relative inline-block">
                     <button
                       onClick={() => setInviteOpen((open) => !open)}
@@ -196,7 +196,9 @@ export default function GroupDetail({
                         <div className="fixed inset-0 z-10" onClick={() => setInviteOpen(false)} />
                         <div className="absolute left-0 top-full mt-2 w-64 border border-neutral-200 rounded-lg bg-white shadow-lg z-20 p-2">
                           <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
-                            {friends.map((f) => {
+                            {friends
+                              .filter((f) => !memberIds.has(f.id))
+                              .map((f) => {
                               const alreadyInvited = invitedIds.includes(f.id);
                               return (
                                 <div
