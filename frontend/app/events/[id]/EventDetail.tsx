@@ -4,77 +4,23 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "../../CurrentUserContext";
 import type { Event, RSVP } from "./page";
+import {
+  normalizeUUID,
+  formatText,
+  capacityNumber,
+  coverGradient,
+  initials,
+  getOrderedHostIds,
+  splitRsvps,
+  STATUS_STYLES,
+  STATUS_MESSAGES,
+} from "./eventDetailLogic";
 
 type User = {
   id: string;
   name: string;
   email: string;
 };
-
-// pgtype.UUID's exact JSON shape wasn't confirmed when this was written —
-// handles both a plain string and pgtype's {Bytes, Valid} struct form so
-// ownership comparisons don't silently break either way.
-function normalizeUUID(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object" && "Bytes" in value) {
-    const bytes = (value as { Bytes: number[] }).Bytes;
-    return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-  return null;
-}
-
-function formatText(value: Event["description"]): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") return value || null;
-  if (typeof value === "object") return value.Valid ? value.String : null;
-  return null;
-}
-
-function capacityNumber(capacity: Event["capacity_max"]): number | null {
-  if (capacity === null || capacity === undefined) return null;
-  if (typeof capacity === "number") return capacity;
-  if (typeof capacity === "object") return capacity.Valid ? capacity.Int32 : null;
-  return null;
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  joined: "bg-green-50 text-green-700 border-green-200",
-  maybe: "bg-purple-50 text-purple-700 border-purple-200",
-  waitlisted: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  pending: "bg-blue-50 text-blue-700 border-blue-200",
-  declined: "bg-neutral-50 text-neutral-500 border-neutral-200",
-};
-
-// Friendlier copy + accent bar color for the "you're already RSVP'd" card —
-// keyed the same way as STATUS_STYLES.
-const STATUS_MESSAGES: Record<string, { label: string; bar: string }> = {
-  joined: { label: "You’re going", bar: "bg-green-500" },
-  maybe: { label: "You might go", bar: "bg-purple-500" },
-  waitlisted: { label: "You’re on the waitlist", bar: "bg-yellow-500" },
-  pending: { label: "Awaiting host approval", bar: "bg-blue-500" },
-};
-
-const CATEGORY_GRADIENTS: Record<string, string> = {
-  Sports: "linear-gradient(135deg,#f97316,#db2777)",
-  Social: "linear-gradient(135deg,#db2777,#7c3aed)",
-  Learning: "linear-gradient(135deg,#7c3aed,#4f46e5)",
-  Outdoors: "linear-gradient(135deg,#16a34a,#0ea5e9)",
-  Music: "linear-gradient(135deg,#f97316,#7c3aed)",
-  Other: "linear-gradient(135deg,#64748b,#334155)",
-};
-
-function coverGradient(category: string | null): string {
-  return CATEGORY_GRADIENTS[category ?? ""] ?? "linear-gradient(135deg,#a855f7,#ec4899,#f97316)";
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSVP[] }) {
   const router = useRouter();
@@ -162,6 +108,10 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
     const capacityValue =
       typeof capacity === "number" ? capacity : capacity && capacity.Valid ? capacity.Int32 : null;
     if (capacityValue !== null) params.set("capacity_max", String(capacityValue));
+    // Carry over which group hosted the original event, so duplicating a
+    // group event doesn't silently reset it to a personal event.
+    const groupId = normalizeUUID(event.group_id);
+    if (groupId) params.set("group_id", groupId);
     router.push(`/events/new?${params.toString()}`);
   }
 
@@ -300,22 +250,11 @@ export default function EventDetail({ event, rsvps }: { event: Event; rsvps: RSV
   }
 
   // Hosts (owner + co-hosts) show up at the top of the RSVPs list
-  // separately, owner first with a crown — so they're excluded below to
-  // avoid showing the same person twice if they also have a leftover RSVP
-  // row (e.g. joined before becoming a co-host).
-  const hostIds_ordered = ownerId
-    ? [ownerId, ...hostIds.filter((id) => id !== ownerId)]
-    : hostIds;
-  const hostIdSet = new Set(hostIds_ordered);
-  const pending = rsvps.filter((r) => r.status === "pending" && !hostIdSet.has(r.user_id));
-  // Declined RSVPs are only visible to the event's actual creator — co-hosts
-  // still see who's pending/joined/etc, just not who turned it down.
-  const others = rsvps.filter(
-    (r) =>
-      r.status !== "pending" &&
-      (r.status !== "declined" || isOwner) &&
-      !hostIdSet.has(r.user_id)
-  );
+  // separately, owner first with a crown. splitRsvps excludes them from
+  // the regular list (and applies the declined-visibility rule) — see
+  // eventDetailLogic.ts for the actual business rules.
+  const hostIds_ordered = getOrderedHostIds(ownerId, hostIds);
+  const { pending, others } = splitRsvps(rsvps, hostIds_ordered, isOwner);
   const joinedCount = rsvps.filter((r) => r.status === "joined").length;
   const capacity = capacityNumber(event.capacity_max);
   const category = formatText(event.category);

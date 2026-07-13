@@ -443,3 +443,24 @@ func listGroupInvitesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(invites)
 }
+
+// listMyGroupInvitesHandler: GET /groups/invites/mine
+// All group invites for the caller (X-User-Id), across every group —
+// used by the notifications panel to show "invited to a group" alerts.
+func listMyGroupInvitesHandler(w http.ResponseWriter, r *http.Request) {
+	var userID pgtype.UUID
+	if err := userID.Scan(r.Header.Get("X-User-Id")); err != nil {
+		http.Error(w, "missing or invalid X-User-Id header", http.StatusUnauthorized)
+		return
+	}
+	invites, err := queries.ListGroupInvitesForUser(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if invites == nil {
+		invites = []sqlcdb.ListGroupInvitesForUserRow{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(invites)
+}

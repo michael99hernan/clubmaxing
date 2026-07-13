@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCurrentUser } from "./CurrentUserContext";
 import Sidebar from "./Sidebar";
+import Notifications from "./Notifications";
 
 function initials(name: string): string {
   return name
@@ -31,6 +32,8 @@ export default function Nav() {
               <path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
+
+          <Notifications />
 
           <Link href="/" className="font-semibold text-lg gradient-text shrink-0">
             ClubMaxing

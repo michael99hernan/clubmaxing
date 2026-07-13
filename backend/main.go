@@ -49,6 +49,7 @@ func main() {
 	mux.HandleFunc("GET /groups/{id}/events", listGroupEventsHandler)
 	mux.HandleFunc("POST /groups/{id}/invites", createGroupInviteHandler)
 	mux.HandleFunc("GET /groups/{id}/invites", listGroupInvitesHandler)
+	mux.HandleFunc("GET /groups/invites/mine", listMyGroupInvitesHandler)
 
 	mux.HandleFunc("POST /friends/requests", sendFriendRequestHandler)
 	mux.HandleFunc("POST /friends/requests/respond", respondFriendRequestHandler)

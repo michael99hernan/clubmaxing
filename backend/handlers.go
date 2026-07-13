@@ -360,6 +360,7 @@ type updateEventRequest struct {
 	StartsAt        time.Time `json:"starts_at"`
 	AccessTier      string    `json:"access_tier"`
 	CapacityMax     *int32    `json:"capacity_max"`
+	GroupID         *string   `json:"group_id"`
 	Category        *string   `json:"category"`
 	InvitePolicy    string    `json:"invite_policy"`
 	Discoverability string    `json:"discoverability"`
@@ -417,6 +418,33 @@ func updateEventHandler(w http.ResponseWriter, r *http.Request) {
 		coverPhotoURL = pgtype.Text{String: *req.CoverPhotoUrl, Valid: true}
 	}
 
+	// Changing which group hosts this event follows the same rule as
+	// creating it under a group in the first place: the person making the
+	// change must be an active member of the target group. requesterUUID
+	// falls back to the owner check already done above via isEventManager,
+	// but we still need *some* user id here to check group membership —
+	// use whichever manager (owner or co-host) is making this request.
+	var groupID pgtype.UUID
+	if req.GroupID != nil && *req.GroupID != "" {
+		if err := groupID.Scan(*req.GroupID); err != nil {
+			http.Error(w, "invalid group_id: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		requesterID, ok := requesterUUID(r)
+		if !ok {
+			http.Error(w, "missing or invalid X-User-Id header", http.StatusUnauthorized)
+			return
+		}
+		member, err := queries.GetGroupMember(r.Context(), sqlcdb.GetGroupMemberParams{
+			GroupID: groupID,
+			UserID:  requesterID,
+		})
+		if err != nil || member.Status != "active" {
+			http.Error(w, "you must be a member of this group to host an event under it", http.StatusForbidden)
+			return
+		}
+	}
+
 	event, err := queries.UpdateEvent(r.Context(), sqlcdb.UpdateEventParams{
 		ID:              id,
 		Title:           req.Title,
@@ -431,6 +459,7 @@ func updateEventHandler(w http.ResponseWriter, r *http.Request) {
 		Discoverability: req.Discoverability,
 		CoverPhotoUrl:   coverPhotoURL,
 		AutoAccept:      req.AutoAccept,
+		GroupID:         groupID,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

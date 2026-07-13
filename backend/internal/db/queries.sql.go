@@ -790,6 +790,48 @@ func (q *Queries) ListGroupInvites(ctx context.Context, groupID pgtype.UUID) ([]
 	return items, nil
 }
 
+const listGroupInvitesForUser = `-- name: ListGroupInvitesForUser :many
+SELECT gi.group_id, gi.user_id, gi.invited_by, gi.created_at, g.name AS group_name
+FROM group_invites gi
+JOIN groups g ON g.id = gi.group_id
+WHERE gi.user_id = $1
+ORDER BY gi.created_at DESC
+`
+
+type ListGroupInvitesForUserRow struct {
+	GroupID   pgtype.UUID        `json:"group_id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	InvitedBy pgtype.UUID        `json:"invited_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	GroupName string             `json:"group_name"`
+}
+
+func (q *Queries) ListGroupInvitesForUser(ctx context.Context, userID pgtype.UUID) ([]ListGroupInvitesForUserRow, error) {
+	rows, err := q.db.Query(ctx, listGroupInvitesForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupInvitesForUserRow
+	for rows.Next() {
+		var i ListGroupInvitesForUserRow
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.UserID,
+			&i.InvitedBy,
+			&i.CreatedAt,
+			&i.GroupName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupMembers = `-- name: ListGroupMembers :many
 SELECT group_id, user_id, role, status, joined_at FROM group_members WHERE group_id = $1 ORDER BY joined_at ASC
 `
@@ -1329,7 +1371,7 @@ const updateEvent = `-- name: UpdateEvent :one
 UPDATE events
 SET title = $2, description = $3, latitude = $4, longitude = $5, starts_at = $6,
     access_tier = $7, capacity_max = $8, category = $9, invite_policy = $10,
-    discoverability = $11, cover_photo_url = $12, auto_accept = $13
+    discoverability = $11, cover_photo_url = $12, auto_accept = $13, group_id = $14
 WHERE id = $1
 RETURNING id, group_id, created_by, title, description, location_name, latitude, longitude, starts_at, ends_at, capacity_max, access_tier, auto_accept, category, invite_policy, discoverability, cover_photo_url, created_at
 `
@@ -1348,6 +1390,7 @@ type UpdateEventParams struct {
 	Discoverability string             `json:"discoverability"`
 	CoverPhotoUrl   pgtype.Text        `json:"cover_photo_url"`
 	AutoAccept      bool               `json:"auto_accept"`
+	GroupID         pgtype.UUID        `json:"group_id"`
 }
 
 func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event, error) {
@@ -1365,6 +1408,7 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event
 		arg.Discoverability,
 		arg.CoverPhotoUrl,
 		arg.AutoAccept,
+		arg.GroupID,
 	)
 	var i Event
 	err := row.Scan(

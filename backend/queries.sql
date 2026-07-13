@@ -15,7 +15,7 @@ RETURNING *;
 UPDATE events
 SET title = $2, description = $3, latitude = $4, longitude = $5, starts_at = $6,
     access_tier = $7, capacity_max = $8, category = $9, invite_policy = $10,
-    discoverability = $11, cover_photo_url = $12, auto_accept = $13
+    discoverability = $11, cover_photo_url = $12, auto_accept = $13, group_id = $14
 WHERE id = $1
 RETURNING *;
 
@@ -171,6 +171,16 @@ SELECT * FROM group_invites WHERE group_id = $1 AND user_id = $2;
 
 -- name: ListGroupInvites :many
 SELECT * FROM group_invites WHERE group_id = $1 ORDER BY created_at ASC;
+
+-- name: ListGroupInvitesForUser :many
+-- All group invites for this user, across every group — used by the
+-- notifications panel so "invited to a group" shows up regardless of
+-- which group it was.
+SELECT gi.group_id, gi.user_id, gi.invited_by, gi.created_at, g.name AS group_name
+FROM group_invites gi
+JOIN groups g ON g.id = gi.group_id
+WHERE gi.user_id = $1
+ORDER BY gi.created_at DESC;
 
 -- name: CreateEventHost :one
 INSERT INTO event_hosts (event_id, user_id, added_by)

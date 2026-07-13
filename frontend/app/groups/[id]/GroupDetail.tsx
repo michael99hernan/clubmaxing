@@ -2,33 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCurrentUser } from "../../CurrentUserContext";
 import EventCard from "../../events/EventCard";
 import type { Group, GroupMember, Event, User } from "./page";
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-function formatDescription(desc: Group["description"]): string {
-  if (typeof desc === "string") return desc;
-  if (desc && typeof desc === "object") return desc.Valid ? desc.String : "";
-  return "";
-}
-
-function normalizeUUID(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object" && "Bytes" in value) {
-    const bytes = (value as { Bytes: number[] }).Bytes;
-    return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-  return null;
-}
+import {
+  formatDescription,
+  normalizeUUID,
+  initials,
+  getMemberIds,
+  getPendingInviteIds,
+  getInvitableFriends,
+} from "./groupDetailLogic";
 
 export default function GroupDetail({
   group,
@@ -58,10 +43,9 @@ export default function GroupDetail({
 
   const activeMembers = members.filter((m) => m.status === "active");
   const pendingMembers = members.filter((m) => m.status === "pending");
-  const memberIds = new Set(members.map((m) => m.user_id));
-  // Invited users who haven't joined yet — once they join they show up in
-  // `members` instead, so this is naturally just the still-pending ones.
-  const pendingInviteIds = invitedIds.filter((id) => !memberIds.has(id));
+  const memberIds = getMemberIds(members);
+  const pendingInviteIds = getPendingInviteIds(invitedIds, memberIds);
+  const invitableFriends = getInvitableFriends(friends, memberIds);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -183,7 +167,7 @@ export default function GroupDetail({
                   </button>
                 )}
 
-                {isActiveMember && friends.filter((f) => !memberIds.has(f.id)).length > 0 && (
+                {isActiveMember && invitableFriends.length > 0 && (
                   <div className="relative inline-block">
                     <button
                       onClick={() => setInviteOpen((open) => !open)}
@@ -196,9 +180,7 @@ export default function GroupDetail({
                         <div className="fixed inset-0 z-10" onClick={() => setInviteOpen(false)} />
                         <div className="absolute left-0 top-full mt-2 w-64 border border-neutral-200 rounded-lg bg-white shadow-lg z-20 p-2">
                           <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
-                            {friends
-                              .filter((f) => !memberIds.has(f.id))
-                              .map((f) => {
+                            {invitableFriends.map((f) => {
                               const alreadyInvited = invitedIds.includes(f.id);
                               return (
                                 <div
@@ -233,9 +215,19 @@ export default function GroupDetail({
 
 
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-3">
-              Events
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                Events
+              </h2>
+              {isActiveMember && (
+                <Link
+                  href={`/events/new?group_id=${group.id}`}
+                  className="text-xs border border-neutral-300 bg-white/70 px-3 py-1.5 rounded-full hover:bg-white transition-colors"
+                >
+                  + New Event
+                </Link>
+              )}
+            </div>
             {events.length === 0 && <p className="text-sm text-neutral-500">No events yet.</p>}
             <div className="grid gap-4 sm:grid-cols-2">
               {events.map((e) => (

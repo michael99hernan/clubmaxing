@@ -1,11 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "../../../CurrentUserContext";
 import { showToast } from "../../../Toast";
 
 type PgText = { String: string; Valid: boolean };
+
+type Group = {
+  id: string;
+  name: string;
+};
+
+function groupIdToInput(groupId: unknown): string {
+  if (groupId === null || groupId === undefined) return "";
+  if (typeof groupId === "string") return groupId;
+  if (typeof groupId === "object" && "Valid" in groupId) {
+    const v = groupId as { Valid: boolean; Bytes?: number[] };
+    if (!v.Valid) return "";
+    // Shouldn't normally hit this — pgtype.UUID marshals as a plain string
+    // — but handle the {Bytes, Valid} shape defensively like elsewhere.
+    if (v.Bytes) return v.Bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return "";
+}
 
 type Event = {
   id: string;
@@ -23,15 +41,6 @@ type Event = {
   auto_accept?: boolean;
   group_id?: unknown;
 };
-
-function hasGroup(groupId: Event["group_id"]): boolean {
-  if (groupId === null || groupId === undefined) return false;
-  if (typeof groupId === "string") return true;
-  if (typeof groupId === "object" && "Valid" in groupId) {
-    return (groupId as { Valid: boolean }).Valid;
-  }
-  return true;
-}
 
 const CATEGORIES = ["Sports", "Social", "Learning", "Outdoors", "Music", "Other"];
 
@@ -72,8 +81,17 @@ export default function EditEventForm({ event }: { event: Event }) {
   const [discoverability, setDiscoverability] = useState(event.discoverability ?? "public");
   const [autoAccept, setAutoAccept] = useState(event.auto_accept ?? false);
   const [capacityMax, setCapacityMax] = useState(capacityToInput(event.capacity_max));
+  const [groupId, setGroupId] = useState(groupIdToInput(event.group_id));
+  const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/groups`)
+      .then((res) => res.json())
+      .then(setGroups)
+      .catch(() => setGroups([]));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,6 +114,7 @@ export default function EditEventForm({ event }: { event: Event }) {
           starts_at: new Date(startsAt).toISOString(),
           access_tier: accessTier,
           capacity_max: capacityMax ? parseInt(capacityMax, 10) : null,
+          group_id: groupId || null,
           category: category || null,
           invite_policy: invitePolicy,
           discoverability,
@@ -220,6 +239,27 @@ export default function EditEventForm({ event }: { event: Event }) {
       </div>
 
       <div>
+        <label className="block text-sm font-medium mb-1">
+          Hosted by group <span className="text-neutral-400">(optional)</span>
+        </label>
+        <select
+          value={groupId}
+          onChange={(e) => setGroupId(e.target.value)}
+          className="w-full border border-neutral-300 rounded-md px-3 py-2 text-sm"
+        >
+          <option value="">Just me (personal event)</option>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-neutral-400 mt-1">
+          You must be a member of a group to host an event under it.
+        </p>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-1">Access</label>
         <select
           value={accessTier}
@@ -255,7 +295,7 @@ export default function EditEventForm({ event }: { event: Event }) {
         </select>
       </div>
 
-      {hasGroup(event.group_id) ? (
+      {groupId ? (
         <p className="text-sm text-neutral-500">
           Who can see this in event lists is determined by the group&rsquo;s access
           setting: open groups are public, request/private groups are members-only.
