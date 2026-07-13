@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf9fb;
+  --foreground: #171717;
+
+  /* Instagram-ish gradient, used sparingly for accents/CTAs/active states */
+  --brand-1: #7c3aed; /* violet */
+  --brand-2: #db2777; /* pink */
+  --brand-3: #f97316; /* orange */
+  --brand-gradient: linear-gradient(135deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Soft fixed gradient blobs behind everything, Claude/GPT-app-shell style:
+   barely-there color in the corners, flat and calm in the middle where
+   content actually lives. */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(600px circle at 0% 0%, rgba(124, 58, 237, 0.10), transparent 60%),
+    radial-gradient(600px circle at 100% 0%, rgba(219, 39, 119, 0.08), transparent 60%),
+    radial-gradient(700px circle at 100% 100%, rgba(249, 115, 22, 0.07), transparent 60%);
+}
+
+.gradient-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gradient-bg {
+  background: var(--brand-gradient);
+}
+
+.gradient-ring {
+  background: var(--brand-gradient);
+  padding: 2px;
+  border-radius: 9999px;
+}
+
+.btn-gradient {
+  background: var(--brand-gradient);
+  color: white;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.btn-gradient:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.btn-gradient:active {
+  transform: translateY(0);
+}
+
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -12px rgba(124, 58, 237, 0.25);
+}
