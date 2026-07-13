@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	sqlcdb "github.com/michael99hernan/clubmax/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,7 +15,13 @@ var pool *pgxpool.Pool
 var queries *sqlcdb.Queries
 
 func connectDB() {
-	connString := "postgres://postgres:devpass@localhost:5432/clubmax"
+	// DATABASE_URL is what Railway (and most Postgres hosts) inject
+	// automatically. Falls back to the old hardcoded local Docker
+	// connection string so `go run .` still works unchanged for local dev.
+	connString := os.Getenv("DATABASE_URL")
+	if connString == "" {
+		connString = "postgres://postgres:devpass@localhost:5432/clubmax"
+	}
 
 	p, err := pgxpool.New(context.Background(), connString)
 	if err != nil {

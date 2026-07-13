@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
@@ -63,8 +64,16 @@ func main() {
 	mux.HandleFunc("GET /events/{id}/hosts", listEventHostsHandler)
 	mux.HandleFunc("DELETE /events/{id}/hosts/{userId}", removeEventHostHandler)
 
-	fmt.Println("Server starting on :8080")
-	err := http.ListenAndServe(":8080", withCORS(mux))
+	// Railway (and most hosts) assign a port at runtime via $PORT — the app
+	// has to listen on whatever it says, not a hardcoded port. Falls back
+	// to 8080 so `go run .` still works unchanged for local dev.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Printf("Server starting on :%s\n", port)
+	err := http.ListenAndServe(":"+port, withCORS(mux))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,8 +90,16 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // the server would actually run the request, but the browser throws
 // the response away.
 func withCORS(next http.Handler) http.Handler {
+	// FRONTEND_URL should be set to the deployed Vercel URL in production
+	// (e.g. https://clubmaxing.vercel.app). Falls back to localhost so
+	// local dev keeps working unchanged.
+	allowedOrigin := os.Getenv("FRONTEND_URL")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:3000"
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User-Id")
 
